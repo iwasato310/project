@@ -9,16 +9,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: コード取得
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pythonセットアップ
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: pytestインストール
-        run: pip install pytest
+      - name: Install tools
+        run: pip install pytest ruff
 
-      - name: テスト実行
+      - name: Run lint
+        run: ruff check .
+
+      - name: Run tests
         run: pytest
