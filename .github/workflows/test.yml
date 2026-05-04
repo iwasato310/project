@@ -27,4 +27,13 @@ jobs:
         run: pytest
 
       - name: Build Docker image
-        run: docker build .
+        run: docker build -t myapp .
+
+      - name: Run Docker container
+        run: docker run -d -p 8000:8000 --name myapp-container myapp
+
+      - name: Wait for API
+        run: sleep 5
+
+      - name: Test API with curl
+        run: curl http://localhost:8000
