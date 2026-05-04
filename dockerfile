@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install pytest ruff
+RUN pip install fastapi uvicorn pytest ruff
 
-CMD ["python"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
