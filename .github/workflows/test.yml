@@ -37,3 +37,9 @@ jobs:
 
       - name: Test API with curl
         run: curl http://localhost:8000
+
+      - name: Validate API response
+        run: |
+          response=$(curl -s http://localhost:8000)
+          echo "$response"
+          test "$response" = '{"message":"Hello Docker FastAPI"}'
