@@ -43,3 +43,9 @@ jobs:
           response=$(curl -s http://localhost:8000)
           echo "$response"
           test "$response" = '{"message":"Hello Docker FastAPI"}'
+
+      - name: Validate dynamic API response
+        run: |
+          response=$(curl -s http://localhost:8000/hello/Taro)
+          echo "$response"
+          test "$response" = '{"message":"Hello Taro"}'
