@@ -17,4 +17,4 @@ def say_hello(name: str):
 
 @app.post("/echo")
 def echo_user(user: User):
-    return {"message": f"Hello: {user.name}"}
+    return {"message": f"Hello {user.name}"}
