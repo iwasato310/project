@@ -49,3 +49,11 @@ jobs:
           response=$(curl -s http://localhost:8000/hello/Taro)
           echo "$response"
           test "$response" = '{"message":"Hello Taro"}'
+
+      - name: Validate POST API response
+        run: |
+          response=$(curl -s -X POST http://localhost:8000/echo \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Taro"}')
+          echo "$response"
+          test "$response" = '{"message":"Hello Taro"}'
