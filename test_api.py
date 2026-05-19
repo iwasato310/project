@@ -24,7 +24,6 @@ def test_create_item():
     assert response.status_code == 200
     assert response.json()["name"] == "apple"
 
-
 def test_list_items():
     response = client.get("/items")
     assert response.status_code == 200
