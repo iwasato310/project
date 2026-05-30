@@ -56,3 +56,28 @@ def test_delete_missing_item():
     assert response.json() == {
         "detail": "Item not found"
     }
+
+def test_update_item():
+    create_response = client.post("/items", json={"name": "apple"})
+    item_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/items/{item_id}",
+        json={"name": "orange"},
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json() == {
+        "id": item_id,
+        "name": "orange",
+    }
+
+
+def test_update_missing_item():
+    response = client.put(
+        "/items/999999",
+        json={"name": "orange"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Item not found"}

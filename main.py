@@ -155,3 +155,26 @@ def delete_item(item_id: int):
 
     return {"message": "Item deleted", "id": item_id}
 
+# PUT /items/{item_id}
+# itemをDBから更新するAPI
+@app.put("/items/{item_id}")
+def update_item(item_id: int, item: Item):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # 指定IDのitemを更新
+    cursor.execute(
+        "UPDATE items SET name = ? WHERE id = ?",
+        (item.name, item_id),
+    )
+
+    updated_count = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+
+    # 存在しないIDだった場合
+    if updated_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return {"id": item_id, "name": item.name}
