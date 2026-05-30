@@ -3,3 +3,10 @@ services:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      DB_NAME: /app/data/items.db
+    volumes:
+      - sqlite_data:/app/data
+
+volumes:
+  sqlite_data:

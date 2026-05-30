@@ -1,12 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sqlite3
+import os
 
 # FastAPIアプリ作成
 app = FastAPI()
 
 # SQLite DBファイル名
-DB_NAME = "items.db"
+# 環境変数DB_NAMEが設定されていればそれを使い、なければitems.dbを使う
+DB_NAME = os.getenv("DB_NAME", "items.db")
 
 # POST /echo 用のJSON型定義
 class User(BaseModel):
@@ -114,4 +116,42 @@ def list_items():
     # (1, "apple")
     # ↓
     # {"id": 1, "name": "apple"}
+    # 補足
+    #　Python のリスト内包表記は 「作るもの → for 文」 の順番で書くルール
+    # 例えば、以下のようなコードはリスト内包表記ではなく、普通のfor文で書いている例
+    # result = []
+    # for row in rows:
+    #     result.append({"id": row[0], "name": row[1]})
+    # return result
     return [{"id": row[0], "name": row[1]} for row in rows]
+
+# DELETE /items/{item_id}
+# itemをDBから削除するAPI
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+
+    # DB接続
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # 指定IDのitemを削除
+    cursor.execute(
+        "DELETE FROM items WHERE id = ?",
+        (item_id,)
+    )
+
+    # 何件削除したか取得
+    deleted_count = cursor.rowcount
+
+    # 保存確定
+    conn.commit()
+
+    # DB切断
+    conn.close()
+
+    # 存在しないIDだった場合
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return {"message": "Item deleted", "id": item_id}
+
