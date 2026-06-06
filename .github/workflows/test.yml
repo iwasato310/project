@@ -39,7 +39,15 @@ jobs:
       # 起動直後はDB接続できない場合があるため
       # 少し待つ
       - name: Wait for API
-        run: sleep 10
+        run: sleep 20
+
+      # 起動状態確認
+      - name: Show container status
+        run: docker compose ps
+
+      # app/db のログ確認
+      - name: Show container logs
+        run: docker compose logs
 
       # Ruffによる静的解析
       #
