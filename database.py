@@ -1,29 +1,35 @@
 import os
-import sqlite3
+import psycopg2
 
-DB_NAME = os.getenv("DB_NAME", "items.db")
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "appdb")
+DB_USER = os.getenv("DB_USER", "appuser")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "apppassword")
+
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    return psycopg2.connect(
+        host=DB_HOST,
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+    )
 
-# DB初期化処理
+
 def init_db():
-    # SQLite DBへ接続
     conn = get_connection()
-    # SQL実行用cursor作成
     cursor = conn.cursor()
 
-    # itemsテーブル作成
-    # 存在していれば何もしない
     cursor.execute(
-        '''
+        """
         CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL
         )
-        '''
+        """
     )
-    # DBへ保存確定
+
     conn.commit()
-    # DB接続終了
+    cursor.close()
     conn.close()

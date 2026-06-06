@@ -6,7 +6,6 @@ from models import Item, User
 # FastAPIアプリ作成
 app = FastAPI()
 
-
 # アプリ起動時にDB初期化
 init_db()
 
@@ -33,26 +32,26 @@ def echo_user(user: User):
 @app.post(
     "/items",
     summary="アイテムを登録する",
-    description="新しいアイテムをSQLiteへ保存します"
+    description="新しいアイテムをPostgreSQLへ保存します"
 )
 def create_item(item: Item):
-    # SQLite DBへ接続
     conn = get_connection()
-    # SQL実行用cursor作成
     cursor = conn.cursor()
 
     # itemsテーブルへINSERT
-    # ? を使うことでSQL Injectionを防止
     cursor.execute(
-        "INSERT INTO items (name) VALUES (?)", 
-        (item.name,)
+        "INSERT INTO items (name) VALUES (%s) RETURNING id",
+        (item.name,),
     )
 
-    # DBへ保存確定
-    conn.commit()
     # INSERTされた行のid取得
-    item_id = cursor.lastrowid
-    # DB接続終了
+    item_id = cursor.fetchone()[0]
+
+    # DBへの変更を確定
+    conn.commit()
+    # SQL実行用カーソルを閉じる
+    cursor.close()
+    # DB接続を終了
     conn.close()
 
     # JSON Response返却
@@ -69,22 +68,22 @@ def create_item(item: Item):
     description="保存済みアイテムをすべて返します"
 )
 def list_items():
-    # SQLite DBへ接続
     conn = get_connection()
-    # SQL実行用cursor作成
     cursor = conn.cursor()
 
     # itemsテーブルから全件取得
     cursor.execute(
-        "SELECT id, name FROM items"
+        "SELECT id, name FROM items ORDER BY id"
     )
     # SQL結果を全件取得
     rows = cursor.fetchall()
 
-    # DB接続終了
+    # SQL実行用カーソルを閉じる
+    cursor.close()
+    # DB接続を終了
     conn.close()
 
-    # SQLite結果をJSON形式へ変換
+    # 結果をJSON形式へ変換
     # 例:
     # (1, "apple")
     # ↓
@@ -97,6 +96,38 @@ def list_items():
     #     result.append({"id": row[0], "name": row[1]})
     # return result
     return [{"id": row[0], "name": row[1]} for row in rows]
+
+# PUT /items/{item_id}
+# itemをDBから更新するAPI
+@app.put(
+    "/items/{item_id}",
+    summary="アイテム更新",
+    description="指定したIDのアイテム名を更新します"
+)
+def update_item(item_id: int, item: Item):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 指定IDのitemを更新
+    cursor.execute(
+        "UPDATE items SET name = %s WHERE id = %s",
+        (item.name, item_id),
+    )
+
+    updated_count = cursor.rowcount
+
+    # DBへの変更を確定
+    conn.commit()
+    # SQL実行用カーソルを閉じる
+    cursor.close()
+    # DB接続を終了
+    conn.close()
+
+    # 存在しないIDだった場合
+    if updated_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return {"id": item_id, "name": item.name}
 
 # DELETE /items/{item_id}
 # itemをDBから削除するAPI
@@ -113,17 +144,18 @@ def delete_item(item_id: int):
 
     # 指定IDのitemを削除
     cursor.execute(
-        "DELETE FROM items WHERE id = ?",
+        "DELETE FROM items WHERE id = %s",
         (item_id,)
     )
 
     # 何件削除したか取得
     deleted_count = cursor.rowcount
 
-    # 保存確定
+    # DBへの変更を確定
     conn.commit()
-
-    # DB切断
+    # SQL実行用カーソルを閉じる
+    cursor.close()
+    # DB接続を終了
     conn.close()
 
     # 存在しないIDだった場合
@@ -131,31 +163,3 @@ def delete_item(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
 
     return {"message": "Item deleted", "id": item_id}
-
-# PUT /items/{item_id}
-# itemをDBから更新するAPI
-@app.put(
-    "/items/{item_id}",
-    summary="アイテム更新",
-    description="指定したIDのアイテム名を更新します"
-)
-def update_item(item_id: int, item: Item):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # 指定IDのitemを更新
-    cursor.execute(
-        "UPDATE items SET name = ? WHERE id = ?",
-        (item.name, item_id),
-    )
-
-    updated_count = cursor.rowcount
-
-    conn.commit()
-    conn.close()
-
-    # 存在しないIDだった場合
-    if updated_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    return {"id": item_id, "name": item.name}
