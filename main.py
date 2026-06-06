@@ -1,46 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import sqlite3
-import os
+
+from database import get_connection, init_db
+from models import Item, User
 
 # FastAPIアプリ作成
 app = FastAPI()
 
-# SQLite DBファイル名
-# 環境変数DB_NAMEが設定されていればそれを使い、なければitems.dbを使う
-DB_NAME = os.getenv("DB_NAME", "items.db")
-
-# POST /echo 用のJSON型定義
-class User(BaseModel):
-    # {"name": "..."} の name
-    name: str
-
-# POST /items 用のJSON型定義
-class Item(BaseModel):
-    # item名
-    name: str
-
-# DB初期化処理
-def init_db():
-    # SQLite DBへ接続
-    conn = sqlite3.connect(DB_NAME)
-    # SQL実行用cursor作成
-    cursor = conn.cursor()
-
-    # itemsテーブル作成
-    # 存在していれば何もしない
-    cursor.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL
-        )
-        '''
-    )
-    # DBへ保存確定
-    conn.commit()
-    # DB接続終了
-    conn.close()
 
 # アプリ起動時にDB初期化
 init_db()
@@ -65,10 +30,14 @@ def echo_user(user: User):
 
 # POST /items
 # itemをDBへ保存するAPI
-@app.post("/items")
+@app.post(
+    "/items",
+    summary="アイテムを登録する",
+    description="新しいアイテムをSQLiteへ保存します"
+)
 def create_item(item: Item):
     # SQLite DBへ接続
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     # SQL実行用cursor作成
     cursor = conn.cursor()
 
@@ -94,10 +63,14 @@ def create_item(item: Item):
 
 # GET /items
 # 保存済みitem一覧を返すAPI
-@app.get("/items")
+@app.get(
+    "/items",
+    summary="アイテム一覧取得",
+    description="保存済みアイテムをすべて返します"
+)
 def list_items():
     # SQLite DBへ接続
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     # SQL実行用cursor作成
     cursor = conn.cursor()
 
@@ -127,11 +100,15 @@ def list_items():
 
 # DELETE /items/{item_id}
 # itemをDBから削除するAPI
-@app.delete("/items/{item_id}")
+@app.delete(
+    "/items/{item_id}",
+    summary="アイテム削除",
+    description="指定したIDのアイテムを削除します"
+)
 def delete_item(item_id: int):
 
     # DB接続
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
 
     # 指定IDのitemを削除
@@ -157,9 +134,13 @@ def delete_item(item_id: int):
 
 # PUT /items/{item_id}
 # itemをDBから更新するAPI
-@app.put("/items/{item_id}")
+@app.put(
+    "/items/{item_id}",
+    summary="アイテム更新",
+    description="指定したIDのアイテム名を更新します"
+)
 def update_item(item_id: int, item: Item):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
 
     # 指定IDのitemを更新
