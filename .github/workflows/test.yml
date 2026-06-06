@@ -1,59 +1,100 @@
 name: Python Test
 
+# push または Pull Request時に実行
 on:
   push:
   pull_request:
 
 jobs:
   test:
+
+    # GitHubが用意するUbuntu環境で実行
     runs-on: ubuntu-latest
 
     steps:
+
+      # ソースコードを取得
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      # Docker Composeのイメージをビルド
+      # DockerfileからFastAPIコンテナを作成
+      - name: Build containers
+        run: docker compose build
 
-      - name: Install tools
-        run: pip install -r requirements.txt
+      # FastAPI + PostgreSQL を起動
+      #
+      # app:
+      #   FastAPIコンテナ
+      #
+      # db:
+      #   PostgreSQLコンテナ
+      #
+      # -d はバックグラウンド実行
+      - name: Start containers
+        run: docker compose up -d
 
-      - name: Run lint
-        run: ruff check .
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Build Docker image
-        run: docker build -t myapp .
-
-      - name: Run Docker container
-        run: docker run -d -p 8000:8000 --name myapp-container myapp
-
+      # FastAPI/PostgreSQL起動待ち
+      #
+      # 起動直後はDB接続できない場合があるため
+      # 少し待つ
       - name: Wait for API
-        run: sleep 5
+        run: sleep 10
 
-      - name: Test API with curl
-        run: curl http://localhost:8000
+      # Ruffによる静的解析
+      #
+      # appコンテナ内で実行
+      #
+      # -T はGitHub Actions用
+      # 擬似端末(TTY)を割り当てない
+      - name: Run lint
+        run: docker compose exec -T app ruff check .
 
+      # pytest実行
+      #
+      # PostgreSQLへ接続するため
+      # appコンテナ内で実行
+      - name: Run tests
+        run: docker compose exec -T app pytest -v
+
+      # GET /
+      #
+      # API起動確認
       - name: Validate API response
         run: |
           response=$(curl -s http://localhost:8000)
           echo "$response"
           test "$response" = '{"message":"Hello Docker FastAPI"}'
 
+      # GET /hello/{name}
+      #
+      # Path Parameter確認
       - name: Validate dynamic API response
         run: |
           response=$(curl -s http://localhost:8000/hello/Taro)
           echo "$response"
           test "$response" = '{"message":"Hello Taro"}'
 
+      # POST /echo
+      #
+      # JSON送信確認
       - name: Validate POST API response
         run: |
           response=$(curl -s -X POST http://localhost:8000/echo \
             -H "Content-Type: application/json" \
             -d '{"name":"Taro"}')
+
           echo "$response"
+
           test "$response" = '{"message":"Hello Taro"}'
+
+      # 後片付け
+      #
+      # always() により
+      # テスト失敗時も必ず実行
+      #
+      # -v は Volume削除
+      # PostgreSQLデータも削除される
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
