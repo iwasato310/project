@@ -1,3 +1,5 @@
+import repositories
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
@@ -42,18 +44,7 @@ def create_item(
     # FastAPIのDependsを使ってDBセッションを取得
     db: Session = Depends(get_db),
 ):
-    # SQLAlchemyのDBモデルを作成
-    # まだDBには保存されていないPythonオブジェクト
-    db_item = ItemDB(name=item.name)
-
-    # DBセッションに登録対象を追加
-    db.add(db_item)
-
-    # DBへ保存確定
-    db.commit()
-
-    # DBで採番されたidなどをdb_itemへ反映
-    db.refresh(db_item)
+    db_item = repositories.create_item(db, item)
 
     # APIレスポンスとして返却
     return {
@@ -73,7 +64,7 @@ def list_items(
     db: Session = Depends(get_db),
 ):
     # itemsテーブルをid順で全件取得
-    items = db.query(ItemDB).order_by(ItemDB.id).all()
+    items = repositories.list_items(db)
 
     # 結果をJSON形式へ変換
     # 例:
@@ -103,8 +94,7 @@ def update_item(
     # DBセッションを取得
     db: Session = Depends(get_db),
 ):
-    # 指定されたIDのitemを1件取得
-    db_item = db.query(ItemDB).filter(ItemDB.id == item_id).first()
+    db_item = repositories.update_item(db, item_id, item)
 
     # 対象が存在しない場合は404を返す
     if db_item is None:
@@ -112,15 +102,6 @@ def update_item(
             status_code=404,
             detail="Item not found",
         )
-
-    # item名を更新
-    db_item.name = item.name
-
-    # DBへ変更を確定
-    db.commit()
-
-    # 更新後のDB情報をdb_itemへ反映
-    db.refresh(db_item)
 
     # 更新後の内容を返却
     return {
@@ -141,8 +122,7 @@ def delete_item(
     # DBセッションを取得
     db: Session = Depends(get_db),
 ):
-    # 指定されたIDのitemを1件取得
-    db_item = db.query(ItemDB).filter(ItemDB.id == item_id).first()
+    db_item = repositories.delete_item(db, item_id)
 
     # 対象が存在しない場合は404を返す
     if db_item is None:
@@ -150,12 +130,6 @@ def delete_item(
             status_code=404,
             detail="Item not found",
         )
-
-    # DBから削除
-    db.delete(db_item)
-
-    # 削除を確定
-    db.commit()
 
     # 削除結果を返却
     return {
