@@ -1,13 +1,15 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
 
-from database import get_connection, init_db
+from database import get_db, init_db_with_retry
+from db_models import ItemDB
 from models import Item, User
 
 # FastAPIアプリ作成
 app = FastAPI()
 
 # アプリ起動時にDB初期化
-init_db()
+init_db_with_retry()
 
 # GET /
 # 動作確認用API
@@ -16,72 +18,62 @@ def read_root():
     return {"message": "Hello Docker FastAPI"}
 
 # GET /hello/{name}
-# URLからnameを受け取るAPI
+# URLの一部を name として受け取るAPI
 @app.get("/hello/{name}")
 def say_hello(name: str):
     return {"message": f"Hello {name}"}
 
 # POST /echo
-# JSONを受け取り、そのまま返すAPI
+# JSONで受け取った name を使ってメッセージを返すAPI
 @app.post("/echo")
 def echo_user(user: User):
     return {"message": f"Hello {user.name}"}
 
 # POST /items
-# itemをDBへ保存するAPI
+# 新しいitemをDBへ登録するAPI
 @app.post(
     "/items",
     summary="アイテムを登録する",
     description="新しいアイテムをPostgreSQLへ保存します"
 )
-def create_item(item: Item):
-    conn = get_connection()
-    cursor = conn.cursor()
+def create_item(
+    item: Item, 
 
-    # itemsテーブルへINSERT
-    cursor.execute(
-        "INSERT INTO items (name) VALUES (%s) RETURNING id",
-        (item.name,),
-    )
+    # FastAPIのDependsを使ってDBセッションを取得
+    db: Session = Depends(get_db),
+):
+    # SQLAlchemyのDBモデルを作成
+    # まだDBには保存されていないPythonオブジェクト
+    db_item = ItemDB(name=item.name)
 
-    # INSERTされた行のid取得
-    item_id = cursor.fetchone()[0]
+    # DBセッションに登録対象を追加
+    db.add(db_item)
 
-    # DBへの変更を確定
-    conn.commit()
-    # SQL実行用カーソルを閉じる
-    cursor.close()
-    # DB接続を終了
-    conn.close()
+    # DBへ保存確定
+    db.commit()
 
-    # JSON Response返却
+    # DBで採番されたidなどをdb_itemへ反映
+    db.refresh(db_item)
+
+    # APIレスポンスとして返却
     return {
-        "id": item_id, 
-        "name": item.name
+        "id": db_item.id,
+        "name": db_item.name,
     }
 
 # GET /items
-# 保存済みitem一覧を返すAPI
+# 保存済みitem一覧を取得するAPI
 @app.get(
     "/items",
     summary="アイテム一覧取得",
     description="保存済みアイテムをすべて返します"
 )
-def list_items():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # itemsテーブルから全件取得
-    cursor.execute(
-        "SELECT id, name FROM items ORDER BY id"
-    )
-    # SQL結果を全件取得
-    rows = cursor.fetchall()
-
-    # SQL実行用カーソルを閉じる
-    cursor.close()
-    # DB接続を終了
-    conn.close()
+def list_items(
+    # DBセッションを取得
+    db: Session = Depends(get_db),
+):
+    # itemsテーブルをid順で全件取得
+    items = db.query(ItemDB).order_by(ItemDB.id).all()
 
     # 結果をJSON形式へ変換
     # 例:
@@ -92,10 +84,10 @@ def list_items():
     #　Python のリスト内包表記は 「作るもの → for 文」 の順番で書くルール
     # 例えば、以下のようなコードはリスト内包表記ではなく、普通のfor文で書いている例
     # result = []
-    # for row in rows:
-    #     result.append({"id": row[0], "name": row[1]})
+    # for item in items:
+    #     result.append({"id": item.id, "name": item.name})
     # return result
-    return [{"id": row[0], "name": row[1]} for row in rows]
+    return [{"id": item.id, "name": item.name} for item in items]
 
 # PUT /items/{item_id}
 # itemをDBから更新するAPI
@@ -104,30 +96,37 @@ def list_items():
     summary="アイテム更新",
     description="指定したIDのアイテム名を更新します"
 )
-def update_item(item_id: int, item: Item):
-    conn = get_connection()
-    cursor = conn.cursor()
+def update_item(
+    item_id: int,
+    item: Item,
 
-    # 指定IDのitemを更新
-    cursor.execute(
-        "UPDATE items SET name = %s WHERE id = %s",
-        (item.name, item_id),
-    )
+    # DBセッションを取得
+    db: Session = Depends(get_db),
+):
+    # 指定されたIDのitemを1件取得
+    db_item = db.query(ItemDB).filter(ItemDB.id == item_id).first()
 
-    updated_count = cursor.rowcount
+    # 対象が存在しない場合は404を返す
+    if db_item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Item not found",
+        )
 
-    # DBへの変更を確定
-    conn.commit()
-    # SQL実行用カーソルを閉じる
-    cursor.close()
-    # DB接続を終了
-    conn.close()
+    # item名を更新
+    db_item.name = item.name
 
-    # 存在しないIDだった場合
-    if updated_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
+    # DBへ変更を確定
+    db.commit()
 
-    return {"id": item_id, "name": item.name}
+    # 更新後のDB情報をdb_itemへ反映
+    db.refresh(db_item)
+
+    # 更新後の内容を返却
+    return {
+        "id": db_item.id,
+        "name": db_item.name,
+    }
 
 # DELETE /items/{item_id}
 # itemをDBから削除するAPI
@@ -136,30 +135,30 @@ def update_item(item_id: int, item: Item):
     summary="アイテム削除",
     description="指定したIDのアイテムを削除します"
 )
-def delete_item(item_id: int):
+def delete_item(
+    item_id: int,
 
-    # DB接続
-    conn = get_connection()
-    cursor = conn.cursor()
+    # DBセッションを取得
+    db: Session = Depends(get_db),
+):
+    # 指定されたIDのitemを1件取得
+    db_item = db.query(ItemDB).filter(ItemDB.id == item_id).first()
 
-    # 指定IDのitemを削除
-    cursor.execute(
-        "DELETE FROM items WHERE id = %s",
-        (item_id,)
-    )
+    # 対象が存在しない場合は404を返す
+    if db_item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Item not found",
+        )
 
-    # 何件削除したか取得
-    deleted_count = cursor.rowcount
+    # DBから削除
+    db.delete(db_item)
 
-    # DBへの変更を確定
-    conn.commit()
-    # SQL実行用カーソルを閉じる
-    cursor.close()
-    # DB接続を終了
-    conn.close()
+    # 削除を確定
+    db.commit()
 
-    # 存在しないIDだった場合
-    if deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    return {"message": "Item deleted", "id": item_id}
+    # 削除結果を返却
+    return {
+        "message": "Item deleted",
+        "id": item_id,
+    }

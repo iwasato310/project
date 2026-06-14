@@ -1,7 +1,12 @@
 import os
 import time
 
-import psycopg2
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+# import psycopg2
+
 
 # 環境変数からDB接続情報を取得
 #
@@ -15,90 +20,63 @@ DB_NAME = os.getenv("DB_NAME", "appdb")
 DB_USER = os.getenv("DB_USER", "appuser")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "apppassword")
 
+# SQLAlchemy用のDB接続URL
+DATABASE_URL = (
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}"
+    f"@{DB_HOST}:5432/{DB_NAME}"
+)
 
-def get_connection():
+
+# DB接続エンジン
+engine = create_engine(DATABASE_URL)
+
+# DBセッション作成用
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
+# DBモデルの基底クラス
+Base = declarative_base()
+
+
+def init_db_with_retry(retries=10, wait_seconds=2):
     """
-    PostgreSQLへ接続する
-
-    Returns:
-        psycopg2 connection
-    """
-
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=5432,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-    )
-
-
-def get_connection_with_retry(
-    retries=10,
-    wait_seconds=2,
-):
-    """
-    PostgreSQL接続リトライ
-
-    GitHub Actions や Docker Compose では
-
-        app起動
-        ↓
-        PostgreSQL起動中
-
-    となることがある。
-
-    DB起動完了まで待機しながら再接続する。
+    DB起動待ち付きでテーブルを作成する
     """
 
     for attempt in range(retries):
-
         try:
-            return get_connection()
+            # db_models.py 内の Base継承クラスを読み込むためにimport
+            import db_models  # noqa: F401
 
-        except psycopg2.OperationalError:
+            # テーブル作成
+            Base.metadata.create_all(bind=engine)
+            return
 
+        except OperationalError:
             print(
                 f"DB connection failed. "
                 f"retry={attempt + 1}/{retries}"
             )
 
-            # 最終リトライなら例外を再送出
             if attempt == retries - 1:
                 raise
 
-            # 少し待って再試行
             time.sleep(wait_seconds)
 
 
-def init_db():
+def get_db():
     """
-    アプリ起動時のDB初期化
-
-    itemsテーブルが存在しなければ作成する。
+    FastAPIで使うDBセッションを取得する
     """
 
-    # DB接続
-    conn = get_connection_with_retry()
+    db = SessionLocal()
 
-    # SQL実行用カーソル取得
-    cursor = conn.cursor()
+    try:
+        yield db
 
-    # テーブル作成
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS items (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL
-        )
-        """
-    )
+    finally:
+        db.close()
 
-    # DBへの変更を確定
-    conn.commit()
-
-    # カーソルを閉じる
-    cursor.close()
-
-    # DB接続を終了
-    conn.close()
