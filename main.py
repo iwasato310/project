@@ -4,7 +4,6 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db, init_db_with_retry
-from db_models import ItemDB
 from models import Item, User
 
 # FastAPIアプリ作成
