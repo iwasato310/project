@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from database import Base, DATABASE_URL  # Import your Base and database URL from the database module
-import db_models  # Import your models to ensure they are registered with the Base
+import db_models    # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
