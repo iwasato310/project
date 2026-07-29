@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String, func
 from database import Base
 
 class ItemDB(Base):
     __tablename__ = 'items'
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, index=True)
+
+    # 登録日時
+    create_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

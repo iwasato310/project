@@ -38,8 +38,9 @@ jobs:
       #
       # 起動直後はDB接続できない場合があるため
       # 少し待つ
-      - name: Wait for API
-        run: sleep 20
+      # - name: Wait for services
+      #   run: sleep 20
+      # -> GitHub Actionsのサービスヘルスチェック(healthcheck)を利用するため不要になった
 
       # 起動状態確認
       - name: Show container status
@@ -47,7 +48,12 @@ jobs:
 
       # app/db のログ確認
       - name: Show container logs
+        if: failure() # テスト失敗時のみ実行
         run: docker compose logs
+
+      # DBマイグレーション実行
+      - name: Apply database migrations
+        run: docker compose exec -T app alembic upgrade head
 
       # Ruffによる静的解析
       #
