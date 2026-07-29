@@ -8,4 +8,4 @@ class ItemDB(Base):
     name = Column(String, nullable=False, index=True)
 
     # 登録日時
-    create_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

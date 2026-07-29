@@ -10,7 +10,7 @@ from models import Item, User
 app = FastAPI()
 
 # アプリ起動時にDB初期化
-init_db_with_retry()
+#init_db_with_retry()
 
 # GET /
 # 動作確認用API

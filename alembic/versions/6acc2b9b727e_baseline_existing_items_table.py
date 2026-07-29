@@ -19,10 +19,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    pass
+    """Create initial items table."""
+
+    op.create_table(
+        "items",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
+    op.create_index(
+        op.f("ix_items_name"),
+        "items",
+        ["name"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    pass
+    """Drop initial items table."""
+
+    op.drop_index(
+        op.f("ix_items_name"),
+        table_name="items",
+    )
+
+    op.drop_table("items")
