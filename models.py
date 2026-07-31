@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
 
 class User(BaseModel):
     name: str = Field(
@@ -6,8 +7,18 @@ class User(BaseModel):
         json_schema_extra={"example": "Taro"}
     )
 
-class Item(BaseModel):
+# POST /items で受け取るデータ
+class ItemCreate(BaseModel):
     name: str = Field(
         description="アイテム名",
         json_schema_extra={"example": "apple"},
     )
+
+# APIから返すデータ
+class ItemResponse(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)

@@ -9,3 +9,6 @@ class ItemDB(Base):
 
     # 登録日時
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # アイテムの状態
+    status = Column(String, nullable=False, server_default='active')

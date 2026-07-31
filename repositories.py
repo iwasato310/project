@@ -1,10 +1,9 @@
 from sqlalchemy.orm import Session
 
 from db_models import ItemDB
-from models import Item
+from models import ItemCreate
 
-
-def create_item(db: Session, item: Item):
+def create_item(db: Session, item: ItemCreate) -> ItemDB:
     # SQLAlchemyのDBモデルを作成
     db_item = ItemDB(name=item.name)
 
@@ -30,7 +29,7 @@ def get_item(db: Session, item_id: int):
     return db.query(ItemDB).filter(ItemDB.id == item_id).first()
 
 
-def update_item(db: Session, item_id: int, item: Item):
+def update_item(db: Session, item_id: int, item: ItemCreate):
     # 更新対象を取得
     db_item = get_item(db, item_id)
 

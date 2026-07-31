@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Item, User
+from models import ItemCreate, ItemResponse, User
 
 # FastAPIアプリ作成
 app = FastAPI()
@@ -34,27 +34,25 @@ def echo_user(user: User):
 # 新しいitemをDBへ登録するAPI
 @app.post(
     "/items",
+    response_model=ItemResponse,
     summary="アイテムを登録する",
     description="新しいアイテムをPostgreSQLへ保存します"
 )
 def create_item(
-    item: Item, 
+    item: ItemCreate, 
 
     # FastAPIのDependsを使ってDBセッションを取得
     db: Session = Depends(get_db),
 ):
-    db_item = repositories.create_item(db, item)
-
     # APIレスポンスとして返却
-    return {
-        "id": db_item.id,
-        "name": db_item.name,
-    }
+    return repositories.create_item(db, item)
+
 
 # GET /items
 # 保存済みitem一覧を取得するAPI
 @app.get(
     "/items",
+    response_model=list[ItemResponse],
     summary="アイテム一覧取得",
     description="保存済みアイテムをすべて返します"
 )
@@ -63,7 +61,7 @@ def list_items(
     db: Session = Depends(get_db),
 ):
     # itemsテーブルをid順で全件取得
-    items = repositories.list_items(db)
+    #items = repositories.list_items(db)
 
     # 結果をJSON形式へ変換
     # 例:
@@ -77,18 +75,21 @@ def list_items(
     # for item in items:
     #     result.append({"id": item.id, "name": item.name})
     # return result
-    return [{"id": item.id, "name": item.name} for item in items]
+    #return [{"id": item.id, "name": item.name} for item in items]
+
+    return repositories.list_items(db)
 
 # PUT /items/{item_id}
 # itemをDBから更新するAPI
 @app.put(
     "/items/{item_id}",
+    response_model=ItemResponse,
     summary="アイテム更新",
     description="指定したIDのアイテム名を更新します"
 )
 def update_item(
     item_id: int,
-    item: Item,
+    item: ItemCreate,
 
     # DBセッションを取得
     db: Session = Depends(get_db),
@@ -103,10 +104,7 @@ def update_item(
         )
 
     # 更新後の内容を返却
-    return {
-        "id": db_item.id,
-        "name": db_item.name,
-    }
+    return db_item
 
 # DELETE /items/{item_id}
 # itemをDBから削除するAPI

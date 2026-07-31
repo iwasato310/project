@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from main import app
+from datetime import datetime
 
 client = TestClient(app)
 
@@ -67,10 +68,13 @@ def test_update_item():
     )
 
     assert update_response.status_code == 200
-    assert update_response.json() == {
-        "id": item_id,
-        "name": "orange",
-    }
+    data = update_response.json()
+    assert data["id"] == item_id
+    assert data["name"] == "orange"
+    assert data["status"] == "active"
+
+    # ISO 8601形式の日時として解釈できることを確認
+    datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
 
 
 def test_update_missing_item():
